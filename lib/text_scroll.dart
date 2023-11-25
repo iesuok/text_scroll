@@ -25,10 +25,11 @@ import 'package:flutter/material.dart';
 class TextScroll extends StatefulWidget {
   const TextScroll(
     this.text, {
-    Key? key,
+    super.key,
     this.style,
     this.textAlign,
     this.textDirection = TextDirection.ltr,
+    this.scrollDirection = Axis.horizontal,
     this.numberOfReps,
     this.delayBefore,
     this.pauseBetween,
@@ -41,7 +42,7 @@ class TextScroll extends StatefulWidget {
     this.fadedBorderWidth = 0.2,
     this.fadeBorderSide = FadeBorderSide.both,
     this.fadeBorderVisibility = FadeBorderVisibility.auto,
-  }) : super(key: key);
+  });
 
   /// The text string, that would be scrolled.
   /// In case text does fit into allocated space, it wouldn't be scrolled
@@ -80,6 +81,10 @@ class TextScroll extends StatefulWidget {
   /// )
   /// ```
   final TextDirection textDirection;
+
+  // Provides [Axis] - a direction in which the scroll will move
+  // Default is [Axis.horizontal]
+  final Axis scrollDirection;
 
   /// Allows to apply custom [TextStyle] to [text].
   ///
@@ -286,10 +291,8 @@ class _TextScrollState extends State<TextScroll> {
   void initState() {
     super.initState();
 
-    final WidgetsBinding? binding = WidgetsBinding.instance;
-    if (binding != null) {
-      binding.addPostFrameCallback(_initScroller);
-    }
+    final WidgetsBinding binding = WidgetsBinding.instance;
+    binding.addPostFrameCallback(_initScroller);
   }
 
   @override
@@ -311,38 +314,41 @@ class _TextScrollState extends State<TextScroll> {
   @override
   Widget build(BuildContext context) {
     assert(
-        widget.intervalSpaces == null || widget.mode == TextScrollMode.endless,
-        'intervalSpaces is only available in TextScrollMode.endless mode');
+      widget.intervalSpaces == null || widget.mode == TextScrollMode.endless,
+      'intervalSpaces is only available in TextScrollMode.endless mode',
+    );
     assert(
-        !widget.fadedBorder ||
-            (widget.fadedBorder &&
-                widget.fadedBorderWidth != null &&
-                widget.fadedBorderWidth! > 0 &&
-                widget.fadedBorderWidth! <= 1),
-        'fadedBorderInterval must be between 0 and 1 when fadedBorder is true');
+      !widget.fadedBorder ||
+          (widget.fadedBorder &&
+              widget.fadedBorderWidth != null &&
+              widget.fadedBorderWidth! > 0 &&
+              widget.fadedBorderWidth! <= 1),
+      'fadedBorderInterval must be between 0 and 1 when fadedBorder is true',
+    );
 
     Widget baseWidget = Directionality(
       textDirection: widget.textDirection,
       child: SingleChildScrollView(
-          controller: _scrollController,
-          physics: NeverScrollableScrollPhysics(),
-          scrollDirection: Axis.horizontal,
-          child: ConstrainedBox(
-            constraints: BoxConstraints(
-              minWidth: _textMinWidth,
-            ),
-            child: widget.selectable
-                ? SelectableText(
-                    _endlessText ?? widget.text,
-                    style: widget.style,
-                    textAlign: widget.textAlign,
-                  )
-                : Text(
-                    _endlessText ?? widget.text,
-                    style: widget.style,
-                    textAlign: widget.textAlign,
-                  ),
-          )),
+        controller: _scrollController,
+        physics: const NeverScrollableScrollPhysics(),
+        scrollDirection: widget.scrollDirection,
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minWidth: _textMinWidth,
+          ),
+          child: widget.selectable
+              ? SelectableText(
+                  _endlessText ?? widget.text,
+                  style: widget.style,
+                  textAlign: widget.textAlign,
+                )
+              : Text(
+                  _endlessText ?? widget.text,
+                  style: widget.style,
+                  textAlign: widget.textAlign,
+                ),
+        ),
+      ),
     );
 
     /// Used to add the fade border effect, if enabled
@@ -351,10 +357,13 @@ class _TextScrollState extends State<TextScroll> {
     /// If fade border is enabled
     if (widget.fadedBorder) {
       ///Fill list with amount of transparent colors to make the text visible
-      final List<Color> colors =
-          List.generate(1 ~/ widget.fadedBorderWidth! - 1, (index) {
-        return Colors.transparent;
-      }, growable: true);
+      final List<Color> colors = List.generate(
+        1 ~/ widget.fadedBorderWidth! - 1,
+        (index) {
+          return Colors.transparent;
+        },
+        growable: true,
+      );
 
       ///Add black color to add gradient fade out
       if (widget.fadeBorderSide == FadeBorderSide.both ||
@@ -371,10 +380,13 @@ class _TextScrollState extends State<TextScroll> {
       }
 
       ///Calculate the stops for the gradient
-      final List<double> stops =
-          List.generate(1 ~/ widget.fadedBorderWidth!, (index) {
-        return (index + 1) * widget.fadedBorderWidth!;
-      }, growable: true);
+      final List<double> stops = List.generate(
+        1 ~/ widget.fadedBorderWidth!,
+        (index) {
+          return (index + 1) * widget.fadedBorderWidth!;
+        },
+        growable: true,
+      );
 
       ///Add first stop to list
       stops.insert(0, 0);
@@ -386,7 +398,7 @@ class _TextScrollState extends State<TextScroll> {
           style: widget.style,
         ),
         textDirection: widget.textDirection,
-        textScaleFactor: MediaQuery.of(context).textScaleFactor,
+        textScaler: MediaQuery.of(context).textScaler,
         textWidthBasis: TextWidthBasis.longestLine,
       )..layout();
 
@@ -487,8 +499,10 @@ class _TextScrollState extends State<TextScroll> {
       setState(() {
         _originalTextWidth =
             position.maxScrollExtent + position.viewportDimension;
-        _endlessText =
-            widget.text + _getSpaces(widget.intervalSpaces ?? 1) + widget.text;
+        _endlessText = widget.text +
+            _getSpaces(widget.intervalSpaces ?? 1) +
+            (widget.scrollDirection == Axis.vertical ? "\n\n" : "") +
+            widget.text;
       });
 
       return;
